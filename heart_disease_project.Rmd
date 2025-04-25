@@ -1,0 +1,100 @@
+---
+title: "Heart Disease Prediction"
+author: "Peter Thai"
+date: "25 April 2025"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+This project applies supervised machine learning techniques to predict the presence of heart disease using the UCI Heart Disease dataset. We will explore the data, train models, and evaluate performance based on accuracy and AUC metrics.
+
+# Load Libraries and Data
+
+```{r load-libraries}
+if (!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+if (!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
+if (!require(randomForest)) install.packages("randomForest", repos = "http://cran.us.r-project.org")
+if (!require(pROC)) install.packages("pROC", repos = "http://cran.us.r-project.org")
+
+library(tidyverse)
+library(caret)
+library(randomForest)
+library(pROC)
+
+heart <- read.csv("heart.csv")
+heart$target <- as.factor(heart$target)
+```
+
+# Exploratory Data Analysis
+
+```{r eda}
+summary(heart)
+str(heart)
+heart %>% GGally::ggpairs(columns = 1:6, aes(color = target))
+```
+
+# Data Partitioning
+
+```{r partition}
+set.seed(123)
+train_index <- createDataPartition(heart$target, p = 0.8, list = FALSE)
+train_data <- heart[train_index, ]
+test_data <- heart[-train_index, ]
+```
+
+# Logistic Regression Model
+
+```{r logistic-regression}
+log_model <- glm(target ~ ., data = train_data, family = "binomial")
+summary(log_model)
+log_probs <- predict(log_model, test_data, type = "response")
+log_preds <- ifelse(log_probs > 0.5, 1, 0) %>% as.factor()
+confusionMatrix(log_preds, test_data$target)
+```
+
+# ROC Curve - Logistic Regression
+
+```{r log-roc}
+log_roc <- roc(test_data$target, log_probs)
+plot(log_roc, main = "ROC Curve - Logistic Regression")
+auc(log_roc)
+```
+
+# Random Forest Model
+
+```{r random-forest}
+set.seed(123)
+rf_model <- randomForest(target ~ ., data = train_data, ntree = 500, mtry = 4, importance = TRUE)
+print(rf_model)
+rf_preds <- predict(rf_model, test_data)
+confusionMatrix(rf_preds, test_data$target)
+```
+
+# ROC Curve - Random Forest
+
+```{r rf-roc}
+rf_probs <- predict(rf_model, test_data, type = "prob")[,2]
+rf_roc <- roc(test_data$target, rf_probs)
+plot(rf_roc, main = "ROC Curve - Random Forest")
+auc(rf_roc)
+```
+
+# Feature Importance
+
+```{r feature-importance}
+varImpPlot(rf_model)
+```
+
+# Conclusion
+
+Both models performed well, with Random Forest showing slightly higher predictive power based on AUC. This demonstrates the value of ensemble methods for structured healthcare data.
+
+# References
+
+- UCI Machine Learning Repository: Heart Disease Dataset
+- caret, randomForest, and pROC R packages
